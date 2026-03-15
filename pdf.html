@@ -2,7 +2,7 @@
 <html lang="it">
 <head>
 <meta charset="UTF-8">
-<title>PDF della Cartella</title>
+<title>File della Cartella</title>
 
 <style>
 body {
@@ -51,21 +51,30 @@ h1 {
   display: flex;
   justify-content: space-between;
   align-items: center;
+  gap: 20px;
 }
 
 .card-title {
-  font-size: 36px;
+  font-size: 32px;
   font-weight: 700;
   color: black;
   max-width: 60%;
   word-break: break-word;
 }
 
+.preview {
+  width: 120px;
+  height: 120px;
+  object-fit: cover;
+  border-radius: 8px;
+  border: 2px solid black;
+  background: white;
+}
+
 .button-column {
   display: flex;
   flex-direction: column;
   gap: 15px;
-  color: green;
 }
 
 .card button {
@@ -82,15 +91,6 @@ h1 {
 
 .card button:hover {
   background: #0056b3;
-}
-
-.preview-img {
-  width: 120px;
-  height: 120px;
-  object-fit: cover;
-  border-radius: 8px;
-  margin-right: 20px;
-  border: 2px solid #222;
 }
 
 #loadingPopup {
@@ -140,78 +140,108 @@ h1 {
 const params = new URLSearchParams(window.location.search);
 const cartella = params.get("cartella");
 
-document.getElementById("titolo").textContent = "Contenuti di: " + cartella;
+document.getElementById("titolo").innerHTML =
+    "File in: " + cartella + "<br>" +
+    "PDF e Immagini con anteprima";
 
-fetch(cartella + "/")
-  .then(response => response.text())
-  .then(text => {
-    const parser = new DOMParser();
-    const html = parser.parseFromString(text, "text/html");
-    const links = [...html.querySelectorAll("a")];
+fetch("elenco.json")
+  .then(r => r.json())
+  .then(data => {
+    const files = data[cartella];
+    const container = document.getElementById("pdf-container");
 
-    const pdfContainer = document.getElementById("pdf-container");
+    const imageExt = [".jpg", ".jpeg", ".png", ".gif", ".webp", ".svg"];
+    
+    files.forEach(file => {
+      const encodedName = encodeURIComponent(file);
+      const encodedFolder = encodeURIComponent(cartella);
 
-    links.forEach(link => {
-      const file = link.getAttribute("href");
-      if (!file) return;
+      const base = window.location.origin + window.location.pathname.replace(/\/[^/]*$/, "/");
+      const directUrl = `${base}pdf/${encodedFolder}/${encodedName}`;
 
-      const lower = file.toLowerCase();
-      const isPDF = lower.endsWith(".pdf");
+      const isPdf = file.toLowerCase().endsWith(".pdf");
+      const isImage = imageExt.some(ext => file.toLowerCase().endsWith(ext));
 
-      if (isPDF) {
-        const card = document.createElement("div");
-        card.className = "card";
+      const gviewUrl = `https://docs.google.com/gview?embedded=1&url=${directUrl}`;
 
-        // Cerco immagine con lo stesso nome del PDF
-        const baseName = file.replace(".pdf", "");
-        const possibleImages = [
-          baseName + ".jpg",
-          baseName + ".jpeg",
-          baseName + ".png"
-        ];
+      const card = document.createElement("div");
+      card.className = "card";
 
-        let previewSrc = null;
+      const icon = isPdf ? "📄" : "🖼️";
 
-        possibleImages.forEach(img => {
-          if (links.some(l => l.getAttribute("href") === img)) {
-            previewSrc = img;
-          }
-        });
-
-        let previewHTML = "";
-        if (previewSrc) {
-          previewHTML = `<img class="preview-img" src="${cartella}/${previewSrc}" alt="preview">`;
-        }
-
-        card.innerHTML = `
-          ${previewHTML}
-          <div class="card-title">${file}</div>
-          <div class="button-column">
-            <button onclick="openPDF('${cartella}/${file}')">Apri PDF</button>
-            <button onclick="downloadPDF('${cartella}/${file}')">Scarica</button>
-          </div>
-        `;
-
-        pdfContainer.appendChild(card);
+      let previewHtml = "";
+      if (isImage) {
+        previewHtml = `<img class="preview" src="${directUrl}" alt="preview">`;
+      } else {
+        previewHtml = `<img class="preview" src="https://upload.wikimedia.org/wikipedia/commons/8/87/PDF_file_icon.svg">`;
       }
+
+      let buttons = "";
+      if (isPdf) {
+        buttons = `
+          <button onclick="openFast('${directUrl}')">Vedi/Scarica</button>
+          <button onclick="openSafe('${directUrl}', '${gviewUrl}')">Vedi Online</button>
+        `;
+      } else if (isImage) {
+        buttons = `
+          <button onclick="openFast('${directUrl}')">Apri Immagine</button>
+        `;
+      }
+
+      card.innerHTML = `
+        ${previewHtml}
+        <div class="card-title">${icon} ${file}</div>
+        <div class="button-column">${buttons}</div>
+      `;
+
+      container.appendChild(card);
     });
   });
 
-function openPDF(url) {
-  document.getElementById("loadingPopup").style.display = "block";
-  setTimeout(() => {
-    window.open(url, "_blank");
-    document.getElementById("loadingPopup").style.display = "none";
-  }, 800);
+function openFast(url) {
+  window.open(url, "_blank");
 }
 
-function downloadPDF(url) {
-  const a = document.createElement("a");
-  a.href = url;
-  a.download = url.split("/").pop();
-  a.click();
+function openSafe(directUrl, gviewUrl) {
+  const base = window.location.origin + window.location.pathname.replace(/\/[^/]*$/, "/");
+  const newTab = window.open(base + "loading.html", "_blank");
+
+  if (!newTab) return;
+
+  showLoading(true, "Caricamento del documento...", "Attendere qualche secondo");
+
+  const frame = document.getElementById("testFrame");
+  frame.src = directUrl;
+
+  setTimeout(() => {
+    let loaded = false;
+
+    try {
+      loaded = frame.contentWindow.location.href !== "about:blank";
+    } catch (e) {
+      loaded = false;
+    }
+
+    showLoading(false);
+
+    if (loaded) {
+      newTab.location.href = directUrl;
+    } else {
+      newTab.location.href = gviewUrl;
+    }
+
+  }, 5000);
+}
+
+function showLoading(show, title = "", subtitle = "") {
+  const popup = document.getElementById("loadingPopup");
+  const sub = document.getElementById("loadingSub");
+
+  popup.style.display = show ? "block" : "none";
+  if (title) popup.childNodes[0].textContent = "⏳ " + title;
+  if (subtitle) sub.textContent = subtitle;
 }
 </script>
 
 </body>
-</html>>
+</html>
