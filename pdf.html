@@ -143,32 +143,47 @@ fetch("elenco.json")
     const pdfs = data[cartella];
     const container = document.getElementById("pdf-container");
 
-    pdfs.forEach(pdf => {
-      const encodedName = encodeURIComponent(pdf);
-      const encodedFolder = encodeURIComponent(cartella);
+    pdfs.forEach(file => {
+  const encodedName = encodeURIComponent(file);
+  const encodedFolder = encodeURIComponent(cartella);
 
-      // 🔥 BASE URL AUTOMATICA (funziona con qualsiasi nome progetto)
-      const base = window.location.origin + window.location.pathname.replace(/\/[^/]*$/, "/");
+  const base = window.location.origin + window.location.pathname.replace(/\/[^/]*$/, "/");
+  const directUrl = `${base}pdf/${encodedFolder}/${encodedName}`;
 
-      // 🔥 URL PDF AUTOMATICO
-      const directUrl = `${base}pdf/${encodedFolder}/${encodedName}`;
+  // Estensioni immagini
+  const imageExt = [".jpg", ".jpeg", ".png", ".gif", ".webp", ".svg"];
+  const isImage = imageExt.some(ext => file.toLowerCase().endsWith(ext));
 
-      // 🔥 GOOGLE VIEWER
-      const gviewUrl = `https://docs.google.com/gview?embedded=1&url=${directUrl}`;
+  // Se è PDF → usa Google Viewer
+  const isPdf = file.toLowerCase().endsWith(".pdf");
+  const gviewUrl = `https://docs.google.com/gview?embedded=1&url=${directUrl}`;
 
-      const card = document.createElement("div");
-      card.className = "card";
+  const card = document.createElement("div");
+  card.className = "card";
 
-      card.innerHTML = `
-        <div class="card-title">📄 ${pdf}</div>
-        <div class="button-column">
-          <button onclick="openFast('${directUrl}')">Vedi/Scarica</button>
-          <button onclick="openSafe('${directUrl}', '${gviewUrl}')">Vedi Online</button>
-        </div>
-      `;
+  // Titolo con icona diversa
+  const icon = isPdf ? "📄" : "🖼️";
 
-      container.appendChild(card);
-    });
+  let buttons = "";
+
+  if (isPdf) {
+    buttons = `
+      <button onclick="openFast('${directUrl}')">Vedi/Scarica</button>
+      <button onclick="openSafe('${directUrl}', '${gviewUrl}')">Vedi Online</button>
+    `;
+  } else if (isImage) {
+    buttons = `
+      <button onclick="openFast('${directUrl}')">Apri Immagine</button>
+    `;
+  }
+
+  card.innerHTML = `
+    <div class="card-title">${icon} ${file}</div>
+    <div class="button-column">${buttons}</div>
+  `;
+
+  container.appendChild(card);
+});
   });
 
 
